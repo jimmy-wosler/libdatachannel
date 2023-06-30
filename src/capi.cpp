@@ -29,7 +29,6 @@ std::unordered_map<int, shared_ptr<PeerConnection>> peerConnectionMap;
 std::unordered_map<int, shared_ptr<DataChannel>> dataChannelMap;
 std::unordered_map<int, shared_ptr<Track>> trackMap;
 #if RTC_ENABLE_MEDIA
-std::unordered_map<int, shared_ptr<MediaChainableHandler>> rtcpChainableHandlerMap;
 std::unordered_map<int, shared_ptr<RtcpSrReporter>> rtcpSrReporterMap;
 std::unordered_map<int, shared_ptr<RtpPacketizationConfig>> rtpConfigMap;
 #endif
@@ -120,7 +119,6 @@ void eraseTrack(int tr) {
 		throw std::invalid_argument("Track ID does not exist");
 #if RTC_ENABLE_MEDIA
 	rtcpSrReporterMap.erase(tr);
-	rtcpChainableHandlerMap.erase(tr);
 	rtpConfigMap.erase(tr);
 #endif
 	userPointerMap.erase(tr);
@@ -133,8 +131,7 @@ size_t eraseAll() {
 	trackMap.clear();
 	peerConnectionMap.clear();
 #if RTC_ENABLE_MEDIA
-	count += rtcpChainableHandlerMap.size() + rtcpSrReporterMap.size() + rtpConfigMap.size();
-	rtcpChainableHandlerMap.clear();
+	count += rtcpSrReporterMap.size() + rtpConfigMap.size();
 	rtcpSrReporterMap.clear();
 	rtpConfigMap.clear();
 #endif
@@ -170,7 +167,6 @@ void eraseChannel(int id) {
 		userPointerMap.erase(id);
 #if RTC_ENABLE_MEDIA
 		rtcpSrReporterMap.erase(id);
-		rtcpChainableHandlerMap.erase(id);
 		rtpConfigMap.erase(id);
 #endif
 		return;
@@ -251,20 +247,6 @@ shared_ptr<RtcpSrReporter> getRtcpSrReporter(int id) {
 void emplaceRtcpSrReporter(shared_ptr<RtcpSrReporter> ptr, int tr) {
 	std::lock_guard lock(mutex);
 	rtcpSrReporterMap.emplace(std::make_pair(tr, ptr));
-}
-
-shared_ptr<MediaChainableHandler> getMediaChainableHandler(int id) {
-	std::lock_guard lock(mutex);
-	if (auto it = rtcpChainableHandlerMap.find(id); it != rtcpChainableHandlerMap.end()) {
-		return it->second;
-	} else {
-		throw std::invalid_argument("RTCP chainable handler ID does not exist");
-	}
-}
-
-void emplaceMediaChainableHandler(shared_ptr<MediaChainableHandler> ptr, int tr) {
-	std::lock_guard lock(mutex);
-	rtcpChainableHandlerMap.emplace(std::make_pair(tr, ptr));
 }
 
 shared_ptr<RtpPacketizationConfig> getRtpConfig(int id) {
@@ -1179,6 +1161,7 @@ int rtcSetH264PacketizationHandler(int tr, const rtcPacketizationHandlerInit *in
 		auto track = getTrack(tr);
 		// create RTP configuration
 		auto rtpConfig = createRtpPacketizationConfig(init);
+		emplaceRtpConfig(rtpConfig, tr);
 		// create packetizer
 		auto nalSeparator = init ? init->nalSeparator : RTC_NAL_SEPARATOR_LENGTH;
 		auto maxFragmentSize = init && init->maxFragmentSize ? init->maxFragmentSize
@@ -1186,12 +1169,7 @@ int rtcSetH264PacketizationHandler(int tr, const rtcPacketizationHandlerInit *in
 		auto packetizer = std::make_shared<H264RtpPacketizer>(
 		    static_cast<rtc::H264RtpPacketizer::Separator>(nalSeparator), rtpConfig,
 		    maxFragmentSize);
-		// create H264 handler
-		auto h264Handler = std::make_shared<H264PacketizationHandler>(packetizer);
-		emplaceMediaChainableHandler(h264Handler, tr);
-		emplaceRtpConfig(rtpConfig, tr);
-		// set handler
-		track->setMediaHandler(h264Handler);
+		track->setMediaHandler(packetizer);
 		return RTC_ERR_SUCCESS;
 	});
 }
@@ -1201,34 +1179,31 @@ int rtcSetOpusPacketizationHandler(int tr, const rtcPacketizationHandlerInit *in
 		auto track = getTrack(tr);
 		// create RTP configuration
 		auto rtpConfig = createRtpPacketizationConfig(init);
+		emplaceRtpConfig(rtpConfig, tr);
 		// create packetizer
 		auto packetizer = std::make_shared<OpusRtpPacketizer>(rtpConfig);
-		// create Opus handler
-		auto opusHandler = std::make_shared<OpusPacketizationHandler>(packetizer);
-		emplaceMediaChainableHandler(opusHandler, tr);
-		emplaceRtpConfig(rtpConfig, tr);
 		// set handler
-		track->setMediaHandler(opusHandler);
+		track->setMediaHandler(packetizer);
 		return RTC_ERR_SUCCESS;
 	});
 }
 
 int rtcChainRtcpSrReporter(int tr) {
 	return wrap([tr] {
+		auto track = getTrack(tr);
 		auto config = getRtpConfig(tr);
 		auto reporter = std::make_shared<RtcpSrReporter>(config);
+		track->chainMediaHandler(reporter);
 		emplaceRtcpSrReporter(reporter, tr);
-		auto chainableHandler = getMediaChainableHandler(tr);
-		chainableHandler->addToChain(reporter);
 		return RTC_ERR_SUCCESS;
 	});
 }
 
 int rtcChainRtcpNackResponder(int tr, unsigned int maxStoredPacketsCount) {
 	return wrap([tr, maxStoredPacketsCount] {
+		auto track = getTrack(tr);
 		auto responder = std::make_shared<RtcpNackResponder>(maxStoredPacketsCount);
-		auto chainableHandler = getMediaChainableHandler(tr);
-		chainableHandler->addToChain(responder);
+		track->chainMediaHandler(responder);
 		return RTC_ERR_SUCCESS;
 	});
 }
@@ -1236,7 +1211,9 @@ int rtcChainRtcpNackResponder(int tr, unsigned int maxStoredPacketsCount) {
 int rtcTransformSecondsToTimestamp(int id, double seconds, uint32_t *timestamp) {
 	return wrap([&] {
 		auto config = getRtpConfig(id);
-		*timestamp = config->secondsToTimestamp(seconds);
+		if(timestamp)
+			*timestamp = config->secondsToTimestamp(seconds);
+
 		return RTC_ERR_SUCCESS;
 	});
 }
@@ -1244,7 +1221,9 @@ int rtcTransformSecondsToTimestamp(int id, double seconds, uint32_t *timestamp) 
 int rtcTransformTimestampToSeconds(int id, uint32_t timestamp, double *seconds) {
 	return wrap([&] {
 		auto config = getRtpConfig(id);
-		*seconds = config->timestampToSeconds(timestamp);
+		if(seconds)
+			*seconds = config->timestampToSeconds(timestamp);
+
 		return RTC_ERR_SUCCESS;
 	});
 }
@@ -1252,7 +1231,9 @@ int rtcTransformTimestampToSeconds(int id, uint32_t timestamp, double *seconds) 
 int rtcGetCurrentTrackTimestamp(int id, uint32_t *timestamp) {
 	return wrap([&] {
 		auto config = getRtpConfig(id);
-		*timestamp = config->timestamp;
+		if(timestamp)
+			*timestamp = config->timestamp;
+
 		return RTC_ERR_SUCCESS;
 	});
 }
@@ -1268,7 +1249,9 @@ int rtcSetTrackRtpTimestamp(int id, uint32_t timestamp) {
 int rtcGetLastTrackSenderReportTimestamp(int id, uint32_t *timestamp) {
 	return wrap([&] {
 		auto sender = getRtcpSrReporter(id);
-		*timestamp = sender->lastReportedTimestamp();
+		if(timestamp)
+			*timestamp = sender->lastReportedTimestamp();
+
 		return RTC_ERR_SUCCESS;
 	});
 }

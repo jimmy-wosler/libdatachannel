@@ -188,41 +188,32 @@ std::vector<binary_ptr> AV1RtpPacketizer::packetizeObu(binary_ptr message,
 AV1RtpPacketizer::AV1RtpPacketizer(AV1RtpPacketizer::Packetization packetization,
                                    shared_ptr<RtpPacketizationConfig> rtpConfig,
                                    uint16_t maximumFragmentSize)
-    : RtpPacketizer(rtpConfig), MediaHandlerRootElement(), maximumFragmentSize(maximumFragmentSize),
+    : RtpPacketizer(rtpConfig), maximumFragmentSize(maximumFragmentSize),
       packetization(packetization) {}
 
-ChainedOutgoingProduct
-AV1RtpPacketizer::processOutgoingBinaryMessage(ChainedMessagesProduct messages,
-                                               message_ptr control) {
-	ChainedMessagesProduct packets = std::make_shared<std::vector<binary_ptr>>();
-	for (auto message : *messages) {
-		std::vector<binary_ptr> obus;
+message_ptr AV1RtpPacketizer::incoming(message_ptr message) { return message; }
 
-		if (packetization == AV1RtpPacketizer::Packetization::TemporalUnit) {
-			obus = extractTemporalUnitObus(message);
-		} else {
-			obus.push_back(message);
-		}
-
-		for (auto obu : obus) {
-			auto payloads = packetizeObu(obu, maximumFragmentSize);
-			if (payloads.size() == 0) {
-				continue;
-			}
-
-			unsigned i = 0;
-			for (; i < payloads.size() - 1; i++) {
-				packets->push_back(packetize(payloads[i], false));
-			}
-			packets->push_back(packetize(payloads[i], true));
-		}
+message_ptr AV1RtpPacketizer::outgoing(message_ptr message) {
+	std::vector<binary_ptr> obus;
+	if (packetization == AV1RtpPacketizer::Packetization::TemporalUnit) {
+		obus = extractTemporalUnitObus(message);
+	} else {
+		obus.push_back(message);
 	}
 
-	if (packets->size() == 0) {
-		return ChainedOutgoingProduct();
+	std::vector<binary_ptr> fragments;
+	for (auto obu : obus) {
+		auto p = packetizeObu(obu, maximumFragmentSize);
+		fragments.insert(fragments.end(), p.begin(), p.end());
 	}
 
-	return {packets, control};
+	if (fragments.size() == 0)
+		return nullptr;
+
+	for (size_t i = 0; i < fragments.size() - 1; i++)
+		send(packetize(fragments[i], false));
+
+	return packetize(fragments[fragments.size() - 1], true);
 }
 
 } // namespace rtc

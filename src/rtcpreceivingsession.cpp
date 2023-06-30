@@ -48,14 +48,13 @@ message_ptr RtcpReceivingSession::incoming(message_ptr ptr) {
 		if (rtp->payloadType() == 201 || rtp->payloadType() == 200) {
 			COUNTER_BAD_RTP_HEADER++;
 			PLOG_VERBOSE << "RTP packet has a payload type indicating RR/SR";
-
 			return nullptr;
 		}
 
-		// Padding-processing is a user-level thing
-
+		// TODO
 		mSsrc = rtp->ssrc();
 
+		// Padding-processing is a user-level thing
 		return ptr;
 	}
 
@@ -82,40 +81,27 @@ message_ptr RtcpReceivingSession::incoming(message_ptr ptr) {
 }
 
 void RtcpReceivingSession::requestBitrate(unsigned int newBitrate) {
+	PLOG_DEBUG << "Requesting bitrate: " << newBitrate << std::endl;
 	mRequestedBitrate = newBitrate;
-
-	PLOG_DEBUG << "[GOOG-REMB] Requesting bitrate: " << newBitrate << std::endl;
 	pushREMB(newBitrate);
 }
 
 void RtcpReceivingSession::pushREMB(unsigned int bitrate) {
-	message_ptr msg = make_message(RtcpRemb::SizeWithSSRCs(1), Message::Control);
-	auto remb = reinterpret_cast<RtcpRemb *>(msg->data());
+	auto message = make_message(RtcpRemb::SizeWithSSRCs(1), Message::Control);
+	auto remb = reinterpret_cast<RtcpRemb *>(message->data());
 	remb->preparePacket(mSsrc, 1, bitrate);
 	remb->setSsrc(0, mSsrc);
-
-	send(msg);
+	send(message);
 }
 
 void RtcpReceivingSession::pushRR(unsigned int lastSR_delay) {
-	auto msg = make_message(RtcpRr::SizeWithReportBlocks(1), Message::Control);
-	auto rr = reinterpret_cast<RtcpRr *>(msg->data());
+	auto message = make_message(RtcpRr::SizeWithReportBlocks(1), Message::Control);
+	auto rr = reinterpret_cast<RtcpRr *>(message->data());
 	rr->preparePacket(mSsrc, 1);
 	rr->getReportBlock(0)->preparePacket(mSsrc, 0, 0, uint16_t(mGreatestSeqNo), 0, 0, mSyncNTPTS,
 	                                     lastSR_delay);
 	rr->log();
-
-	send(msg);
-}
-
-bool RtcpReceivingSession::send(message_ptr msg) {
-	try {
-		outgoingCallback(std::move(msg));
-		return true;
-	} catch (const std::exception &e) {
-		LOG_DEBUG << "RTCP tx failed: " << e.what();
-	}
-	return false;
+	send(message);
 }
 
 bool RtcpReceivingSession::requestKeyframe() {
@@ -124,10 +110,10 @@ bool RtcpReceivingSession::requestKeyframe() {
 }
 
 void RtcpReceivingSession::pushPLI() {
-	auto msg = make_message(RtcpPli::Size(), Message::Control);
-	auto *pli = reinterpret_cast<RtcpPli *>(msg->data());
+	auto message = make_message(RtcpPli::Size(), Message::Control);
+	auto *pli = reinterpret_cast<RtcpPli *>(message->data());
 	pli->preparePacket(mSsrc);
-	send(msg);
+	send(message);
 }
 
 } // namespace rtc

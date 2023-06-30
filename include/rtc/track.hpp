@@ -44,6 +44,7 @@ public:
 	bool requestKeyframe();
 
 	void setMediaHandler(shared_ptr<MediaHandler> handler);
+	void chainMediaHandler(shared_ptr<MediaHandler> handler);
 	shared_ptr<MediaHandler> getMediaHandler();
 
 	// Deprecated, use setMediaHandler() and getMediaHandler()

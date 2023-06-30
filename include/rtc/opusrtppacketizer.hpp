@@ -11,36 +11,41 @@
 
 #if RTC_ENABLE_MEDIA
 
-#include "mediahandlerrootelement.hpp"
 #include "rtppacketizer.hpp"
 
 namespace rtc {
 
-/// RTP packetizer for opus
-class RTC_CPP_EXPORT OpusRtpPacketizer final : public RtpPacketizer,
-                                               public MediaHandlerRootElement {
+// RTP packetizer for Opus
+class RTC_CPP_EXPORT OpusRtpPacketizer final : public RtpPacketizer {
 public:
-	/// default clock rate used in opus RTP communication
+	// default clock rate used in opus RTP communication
 	inline static const uint32_t defaultClockRate = 48 * 1000;
 
-	/// Constructs opus packetizer with given RTP configuration.
-	/// @note RTP configuration is used in packetization process which may change some configuration
-	/// properties such as sequence number.
-	/// @param rtpConfig  RTP configuration
+	// Constructs opus packetizer with given RTP configuration.
+	// @note RTP configuration is used in packetization process which may change some configuration
+	// properties such as sequence number.
+	// @param rtpConfig  RTP configuration
 	OpusRtpPacketizer(shared_ptr<RtpPacketizationConfig> rtpConfig);
 
-	/// Creates RTP packet for given payload based on `rtpConfig`.
-	/// @note This function increase sequence number after packetization.
-	/// @param payload RTP payload
-	/// @param setMark This needs to be `false` for all RTP packets with opus payload
-	binary_ptr packetize(binary_ptr payload, bool setMark) override;
+	message_ptr incoming(message_ptr message) override;
+	message_ptr outgoing(message_ptr message) override;
+};
 
-	/// Creates RTP packet for given samples (all samples share same RTP timesamp)
-	/// @param messages opus samples
-	/// @param control RTCP
-	/// @returns RTP packets and unchanged `control`
-	ChainedOutgoingProduct processOutgoingBinaryMessage(ChainedMessagesProduct messages,
-	                                                    message_ptr control) override;
+// Dummy wrapper for backward compatibility
+class RTC_CPP_EXPORT OpusPacketizationHandler final : public MediaHandler {
+public:
+	OpusPacketizationHandler(shared_ptr<OpusRtpPacketizer> packetizer)
+	    : mPacketizer(std::move(packetizer)) {}
+
+	inline message_ptr incoming(message_ptr message) override {
+		return mPacketizer->incoming(std::move(message));
+	}
+	inline message_ptr outgoing(message_ptr message) override {
+		return mPacketizer->outgoing(std::move(message));
+	}
+
+private:
+	shared_ptr<OpusRtpPacketizer> mPacketizer;
 };
 
 } // namespace rtc

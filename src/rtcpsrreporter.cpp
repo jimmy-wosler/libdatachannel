@@ -16,6 +16,7 @@
 
 namespace {
 
+// TODO: move to utils
 uint64_t ntp_time() {
 	const auto now = std::chrono::system_clock::now();
 	const double secs = std::chrono::duration<double>(now.time_since_epoch()).count();
@@ -27,24 +28,6 @@ uint64_t ntp_time() {
 
 namespace rtc {
 
-ChainedOutgoingProduct RtcpSrReporter::processOutgoingBinaryMessage(ChainedMessagesProduct messages,
-                                                                    message_ptr control) {
-	if (std::exchange(mNeedsToReport, false)) {
-		auto timestamp = rtpConfig->timestamp;
-		auto sr = getSenderReport(timestamp);
-		if (control) {
-			control->insert(control->end(), sr->begin(), sr->end());
-		} else {
-			control = sr;
-		}
-	}
-	for (auto message : *messages) {
-		auto rtp = reinterpret_cast<RtpHeader *>(message->data());
-		addToReport(rtp, uint32_t(message->size()));
-	}
-	return {messages, control};
-}
-
 void RtcpSrReporter::addToReport(RtpHeader *rtp, uint32_t rtpSize) {
 	mPacketCount += 1;
 	assert(!rtp->padding());
@@ -52,7 +35,7 @@ void RtcpSrReporter::addToReport(RtpHeader *rtp, uint32_t rtpSize) {
 }
 
 RtcpSrReporter::RtcpSrReporter(shared_ptr<RtpPacketizationConfig> rtpConfig)
-    : MediaHandlerElement(), rtpConfig(rtpConfig) {
+    : rtpConfig(rtpConfig) {
 	mLastReportedTimestamp = rtpConfig->timestamp;
 }
 
@@ -79,12 +62,31 @@ message_ptr RtcpSrReporter::getSenderReport(uint32_t timestamp) {
 	return msg;
 }
 
-void RtcpSrReporter::setNeedsToReport() {
-	mNeedsToReport = true;
-}
+void RtcpSrReporter::setNeedsToReport() { mNeedsToReport = true; }
 
-uint32_t RtcpSrReporter::lastReportedTimestamp() const {
-	return mLastReportedTimestamp;
+uint32_t RtcpSrReporter::lastReportedTimestamp() const { return mLastReportedTimestamp; }
+
+message_ptr RtcpSrReporter::incoming(message_ptr message) { return message; }
+
+message_ptr RtcpSrReporter::outgoing(message_ptr message) {
+	if (!IsRtcp(*message)) {
+		if (std::exchange(mNeedsToReport, false)) {
+			auto timestamp = rtpConfig->timestamp;
+			auto sr = getSenderReport(timestamp);
+			// TODO
+			// if (control) {
+			//	control->insert(control->end(), sr->begin(), sr->end());
+			//} else {
+			//	control = sr;
+			//}
+			send(sr);
+		}
+
+		auto rtp = reinterpret_cast<RtpHeader *>(message->data());
+		addToReport(rtp, uint32_t(message->size()));
+	}
+
+	return message;
 }
 
 } // namespace rtc

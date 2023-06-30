@@ -15,22 +15,14 @@
 namespace rtc {
 
 OpusRtpPacketizer::OpusRtpPacketizer(shared_ptr<RtpPacketizationConfig> rtpConfig)
-    : RtpPacketizer(rtpConfig), MediaHandlerRootElement() {}
+    : RtpPacketizer(rtpConfig) {}
 
-binary_ptr OpusRtpPacketizer::packetize(binary_ptr payload, [[maybe_unused]] bool setMark) {
-	assert(!setMark);
-	return RtpPacketizer::packetize(payload, false);
+message_ptr OpusRtpPacketizer::incoming(message_ptr message) {
+	return message;
 }
 
-ChainedOutgoingProduct
-OpusRtpPacketizer::processOutgoingBinaryMessage(ChainedMessagesProduct messages,
-                                                message_ptr control) {
-	ChainedMessagesProduct packets = make_chained_messages_product();
-	packets->reserve(messages->size());
-	for (auto message : *messages) {
-		packets->push_back(packetize(message, false));
-	}
-	return {packets, control};
+message_ptr OpusRtpPacketizer::outgoing(message_ptr message) {
+	return packetize(message, false);
 }
 
 } // namespace rtc

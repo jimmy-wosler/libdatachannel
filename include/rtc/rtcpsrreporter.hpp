@@ -11,29 +11,29 @@
 
 #if RTC_ENABLE_MEDIA
 
-#include "mediahandlerelement.hpp"
-#include "message.hpp"
+#include "mediahandler.hpp"
 #include "rtppacketizationconfig.hpp"
+#include "rtp.hpp"
 
 namespace rtc {
 
-class RTC_CPP_EXPORT RtcpSrReporter final : public MediaHandlerElement {
+class RTC_CPP_EXPORT RtcpSrReporter final : public MediaHandler {
 	void addToReport(RtpHeader *rtp, uint32_t rtpSize);
 	message_ptr getSenderReport(uint32_t timestamp);
 
 public:
-	/// RTP configuration
+	// RTP configuration
 	const shared_ptr<RtpPacketizationConfig> rtpConfig;
 
 	RtcpSrReporter(shared_ptr<RtpPacketizationConfig> rtpConfig);
-
-	ChainedOutgoingProduct processOutgoingBinaryMessage(ChainedMessagesProduct messages,
-	                                                    message_ptr control) override;
 
 	uint32_t lastReportedTimestamp() const;
 	void setNeedsToReport();
 
 private:
+	message_ptr incoming(message_ptr message) override;
+	message_ptr outgoing(message_ptr message) override;
+
 	uint32_t mPacketCount = 0;
 	uint32_t mPayloadOctets = 0;
 	uint32_t mLastReportedTimestamp = 0;

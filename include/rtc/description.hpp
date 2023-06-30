@@ -109,6 +109,7 @@ public:
 
 		std::vector<int> extIds();
 		ExtMap *extMap(int id);
+		const ExtMap *extMap(int id) const;
 		void addExtMap(ExtMap map);
 		void removeExtMap(int id);
 
@@ -208,6 +209,7 @@ public:
 		bool hasPayloadType(int payloadType) const;
 		std::vector<int> payloadTypes() const;
 		RtpMap *rtpMap(int payloadType);
+		const RtpMap *rtpMap(int payloadType) const;
 		void addRtpMap(RtpMap map);
 		void removeRtpMap(int payloadType);
 		void removeFormat(const string &format);

@@ -11,14 +11,14 @@
 
 #if RTC_ENABLE_MEDIA
 
-#include "mediahandlerelement.hpp"
+#include "mediahandler.hpp"
 
 #include <queue>
 #include <unordered_map>
 
 namespace rtc {
 
-class RTC_CPP_EXPORT RtcpNackResponder final : public MediaHandlerElement {
+class RTC_CPP_EXPORT RtcpNackResponder final : public MediaHandler {
 
 	/// Packet storage
 	class RTC_CPP_EXPORT Storage {
@@ -60,23 +60,16 @@ class RTC_CPP_EXPORT RtcpNackResponder final : public MediaHandlerElement {
 		void store(binary_ptr packet);
 	};
 
-	const shared_ptr<Storage> storage;
-	std::mutex reportMutex;
+	const shared_ptr<Storage> mStorage;
 
 public:
 	RtcpNackResponder(unsigned maxStoredPacketCount = Storage::defaultMaximumSize);
 
-	/// Checks for RTCP NACK and handles it,
-	/// @param message RTCP message
-	/// @returns unchanged RTCP message and requested RTP packets
-	ChainedIncomingControlProduct processIncomingControlMessage(message_ptr message) override;
+	// Checks for RTCP NACK and handles it,
+	message_ptr incoming(message_ptr message) override;
 
-	/// Stores RTP packets in internal storage
-	/// @param messages RTP packets
-	/// @param control RTCP
-	/// @returns Unchanged RTP and RTCP
-	ChainedOutgoingProduct processOutgoingBinaryMessage(ChainedMessagesProduct messages,
-	                                                    message_ptr control) override;
+	// Stores RTP packets in internal storage
+	message_ptr outgoing(message_ptr message) override;
 };
 
 } // namespace rtc

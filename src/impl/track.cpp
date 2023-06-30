@@ -19,8 +19,8 @@ static LogCounter COUNTER_MEDIA_BAD_DIRECTION(plog::warning,
 static LogCounter COUNTER_QUEUE_FULL(plog::warning,
                                      "Number of media packets dropped due to a full queue");
 
-Track::Track(weak_ptr<PeerConnection> pc, Description::Media description)
-    : mPeerConnection(pc), mMediaDescription(std::move(description)),
+Track::Track(weak_ptr<PeerConnection> pc, Description::Media desc)
+    : mPeerConnection(pc), mMediaDescription(std::move(desc)),
       mRecvQueue(RECV_QUEUE_LIMIT, [](const message_ptr &m) { return m->size(); }) {
 
 	// Discard messages by default if track is send only
@@ -49,12 +49,17 @@ Description::Media Track::description() const {
 	return mMediaDescription;
 }
 
-void Track::setDescription(Description::Media description) {
-	std::unique_lock lock(mMutex);
-	if (description.mid() != mMediaDescription.mid())
-		throw std::logic_error("Media description mid does not match track mid");
+void Track::setDescription(Description::Media desc) {
+	{
+		std::unique_lock lock(mMutex);
+		if (desc.mid() != mMediaDescription.mid())
+			throw std::logic_error("Media description mid does not match track mid");
 
-	mMediaDescription = std::move(description);
+		mMediaDescription = std::move(desc);
+	}
+
+	if (auto handler = getMediaHandler())
+		handler->media(description());
 }
 
 void Track::close() {
@@ -126,8 +131,6 @@ void Track::incoming(message_ptr message) {
 	if (!message)
 		return;
 
-	auto handler = getMediaHandler();
-
 	auto dir = direction();
 	if ((dir == Description::Direction::SendOnly || dir == Description::Direction::Inactive) &&
 	    message->type != Message::Control) {
@@ -135,8 +138,8 @@ void Track::incoming(message_ptr message) {
 		return;
 	}
 
-	if (handler) {
-		message = handler->incoming(message);
+	if(auto handler = getMediaHandler()) {
+		message = handler->incomingChain(std::move(message));
 		if (!message)
 			return;
 	}
@@ -169,7 +172,7 @@ bool Track::outgoing(message_ptr message) {
 	}
 
 	if (handler) {
-		message = handler->outgoing(message);
+		message = handler->outgoingChain(std::move(message));
 		if (!message)
 			return false;
 	}
@@ -210,8 +213,10 @@ void Track::setMediaHandler(shared_ptr<MediaHandler> handler) {
 		mMediaHandler = handler;
 	}
 
-	if (handler)
+	if (handler) {
 		handler->onOutgoing(std::bind(&Track::transportSend, this, std::placeholders::_1));
+		handler->media(description());
+	}
 }
 
 shared_ptr<MediaHandler> Track::getMediaHandler() {
