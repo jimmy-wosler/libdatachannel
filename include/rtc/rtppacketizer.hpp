@@ -11,31 +11,35 @@
 
 #if RTC_ENABLE_MEDIA
 
+#include "mediahandler.hpp"
 #include "message.hpp"
 #include "rtppacketizationconfig.hpp"
 
 namespace rtc {
 
-/// Class responsible for RTP packetization
-class RTC_CPP_EXPORT RtpPacketizer {
-	static const auto rtpHeaderSize = 12;
-	static const auto rtpExtHeaderCvoSize = 8;
-
+// RTP packetizer
+class RTC_CPP_EXPORT RtpPacketizer : public MediaHandler {
 public:
-	// RTP configuration
+	// RTP packetization config
 	const shared_ptr<RtpPacketizationConfig> rtpConfig;
 
-	/// Constructs packetizer with given RTP configuration.
-	/// @note RTP configuration is used in packetization process which may change some configuration
-	/// properties such as sequence number.
-	/// @param rtpConfig  RTP configuration
+	// Constructs packetizer with given RTP configuration.
+	// @note RTP configuration is used in packetization process which may change some configuration
+	// properties such as sequence number.
+	// @param rtpConfig  RTP configuration
 	RtpPacketizer(shared_ptr<RtpPacketizationConfig> rtpConfig);
 
-	/// Creates RTP packet for given payload based on `rtpConfig`.
-	/// @note This function increase sequence number after packetization.
-	/// @param payload RTP payload
-	/// @param setMark Set marker flag in RTP packet if true
-	virtual shared_ptr<binary> packetize(shared_ptr<binary> payload, bool setMark);
+	// Creates RTP packet for given payload based on `rtpConfig`.
+	// @note This function increase sequence number after packetization.
+	// @param payload RTP payload
+	// @param setMark Set marker flag in RTP packet if true
+	virtual message_ptr packetize(shared_ptr<binary> payload, bool mark);
+
+private:
+	static const auto RtpHeaderSize = 12;
+	static const auto RtpExtHeaderCvoSize = 8;
+
+	virtual void media(const Description::Media &desc) override;
 };
 
 } // namespace rtc

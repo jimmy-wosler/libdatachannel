@@ -498,10 +498,9 @@ void PeerConnection::forwardMedia(message_ptr message) {
 	if (!message)
 		return;
 
-	auto handler = getMediaHandler();
-
-	if (handler) {
-		message = handler->incoming(message);
+	// TODO: outgoing
+	if(auto handler = getMediaHandler()) {
+		message = handler->incoming(std::move(message));
 		if (!message)
 			return;
 	}
@@ -742,6 +741,10 @@ shared_ptr<Track> PeerConnection::emplaceTrack(Description::Media description) {
 		mTrackLines.emplace_back(track);
 	}
 
+	auto handler = getMediaHandler();
+	if(handler)
+		handler->media(track->description());
+
 	if (track->description().isRemoved())
 		track->close();
 
@@ -910,6 +913,10 @@ void PeerConnection::processLocalDescription(Description description) {
 				        mTracks.emplace(std::make_pair(track->mid(), track));
 				        mTrackLines.emplace_back(track);
 				        triggerTrack(track); // The user may modify the track description
+
+						auto handler = getMediaHandler();
+						if(handler)
+							handler->media(track->description());
 
 				        if (track->description().isRemoved())
 					        track->close();

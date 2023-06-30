@@ -23,13 +23,16 @@ template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 // weak_ptr bind helper
-template <typename F, typename T, typename... Args> auto weak_bind(F &&f, T *t, Args &&..._args) {
-	return [bound = std::bind(f, t, _args...), weak_this = t->weak_from_this()](auto &&...args) {
-		if (auto shared_this = weak_this.lock())
-			return bound(args...);
+template <typename F, typename T, typename... Args> auto weak_bind(F &&f, std::shared_ptr<T> t, Args &&...args) {
+	return [bound = std::bind(f, t.get(), args...), weak = std::weak_ptr<T>(t)](auto &&..._args) {
+		if (auto shared_this = weak.lock())
+			return bound(_args...);
 		else
-			return static_cast<decltype(bound(args...))>(false);
+			return static_cast<decltype(bound(_args...))>(false);
 	};
+}
+template <typename F, typename T, typename... Args> auto weak_bind(F &&f, T *t, Args &&...args) {
+	return weak_bind(std::forward<F>(f), t->shared_from_this(), std::forward<Args>(args)...);
 }
 
 // scope_guard helper

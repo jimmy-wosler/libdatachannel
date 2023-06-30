@@ -17,13 +17,13 @@ namespace rtc {
 
 RtpPacketizer::RtpPacketizer(shared_ptr<RtpPacketizationConfig> rtpConfig) : rtpConfig(rtpConfig) {}
 
-binary_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool setMark) {
+message_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool mark) {
 	size_t rtpExtHeaderSize = 0;
 
 	const bool setVideoRotation = (rtpConfig->videoOrientationId != 0) &&
 	                              (rtpConfig->videoOrientationId <
 	                               15) && // needs fixing if longer extension headers are supported
-	                              setMark &&
+	                              mark &&
 	                              (rtpConfig->videoOrientation != 0);
 
 	if (setVideoRotation) {
@@ -42,15 +42,14 @@ binary_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool setMark) {
 		rtpExtHeaderSize += 4;
 	}
 
-	auto msg = std::make_shared<binary>(rtpHeaderSize + rtpExtHeaderSize + payload->size());
-	auto *rtp = (RtpHeader *)msg->data();
+	auto message = make_message(RtpHeaderSize + rtpExtHeaderSize + payload->size());
+	auto *rtp = reinterpret_cast<RtpHeader *>(message->data());
 	rtp->setPayloadType(rtpConfig->payloadType);
-	// increase sequence number
-	rtp->setSeqNumber(rtpConfig->sequenceNumber++);
+	rtp->setSeqNumber(rtpConfig->sequenceNumber++); // increase sequence number
 	rtp->setTimestamp(rtpConfig->timestamp);
 	rtp->setSsrc(rtpConfig->ssrc);
 
-	if (setMark) {
+	if (mark) {
 		rtp->setMarker(true);
 	}
 
@@ -58,7 +57,7 @@ binary_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool setMark) {
 		rtp->setExtension(true);
 
 		auto extHeader = rtp->getExtensionHeader();
-		extHeader->setProfileSpecificId(0xbede);
+		extHeader->setProfileSpecificId(0xBEDE);
 
 		auto headerLength = static_cast<uint16_t>(rtpExtHeaderSize - 4);
 		headerLength = static_cast<uint16_t>((headerLength + 3) / 4);
@@ -74,25 +73,27 @@ binary_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool setMark) {
 		}
 
 		if (rtpConfig->mid.has_value()) {
-			extHeader->writeOneByteHeader(
-			    offset, rtpConfig->midId,
-			    reinterpret_cast<const std::byte *>(rtpConfig->mid->c_str()),
-			    rtpConfig->mid->length());
+			extHeader->writeOneByteHeader(offset, rtpConfig->midId,
+			                              reinterpret_cast<const byte *>(rtpConfig->mid->c_str()),
+			                              rtpConfig->mid->length());
 			offset += (1 + rtpConfig->mid->length());
 		}
 
 		if (rtpConfig->rid.has_value()) {
-			extHeader->writeOneByteHeader(
-			    offset, rtpConfig->ridId,
-			    reinterpret_cast<const std::byte *>(rtpConfig->rid->c_str()),
-			    rtpConfig->rid->length());
+			extHeader->writeOneByteHeader(offset, rtpConfig->ridId,
+			                              reinterpret_cast<const byte *>(rtpConfig->rid->c_str()),
+			                              rtpConfig->rid->length());
 		}
 	}
 
 	rtp->preparePacket();
-	std::memcpy(msg->data() + rtpHeaderSize + rtpExtHeaderSize, payload->data(), payload->size());
-	return msg;
+
+	std::copy(payload->begin(), payload->end(), message->data() + RtpHeaderSize + rtpExtHeaderSize);
+
+	return message;
 }
+
+void RtpPacketizer::media([[maybe_unused]] const Description::Media &desc) {}
 
 } // namespace rtc
 

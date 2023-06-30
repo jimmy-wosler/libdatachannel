@@ -28,7 +28,7 @@ struct PeerConnection;
 
 class Track final : public std::enable_shared_from_this<Track>, public Channel {
 public:
-	Track(weak_ptr<PeerConnection> pc, Description::Media description);
+	Track(weak_ptr<PeerConnection> pc, Description::Media desc);
 	~Track();
 
 	void close();
@@ -46,13 +46,14 @@ public:
 	string mid() const;
 	Description::Direction direction() const;
 	Description::Media description() const;
-	void setDescription(Description::Media description);
+	void setDescription(Description::Media desc);
 
 	shared_ptr<MediaHandler> getMediaHandler();
 	void setMediaHandler(shared_ptr<MediaHandler> handler);
 
 #if RTC_ENABLE_MEDIA
 	void open(shared_ptr<DtlsSrtpTransport> transport);
+	shared_ptr<DtlsSrtpTransport> getTransport() const;
 #endif
 
 private:
@@ -60,15 +61,14 @@ private:
 
 	const weak_ptr<PeerConnection> mPeerConnection;
 #if RTC_ENABLE_MEDIA
-	weak_ptr<DtlsSrtpTransport> mDtlsSrtpTransport;
+	weak_ptr<DtlsSrtpTransport> mTransport;
+	mutable std::mutex mTransportMutex;
 #endif
+	shared_ptr<MediaHandler> mMediaHandler;
+	std::atomic<bool> mIsClosed = false;
 
 	Description::Media mMediaDescription;
-	shared_ptr<MediaHandler> mMediaHandler;
-
-	mutable std::shared_mutex mMutex;
-
-	std::atomic<bool> mIsClosed = false;
+	mutable std::shared_mutex mDescriptionMutex;
 
 	Queue<message_ptr> mRecvQueue;
 };

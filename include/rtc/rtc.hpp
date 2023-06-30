@@ -27,15 +27,13 @@
 
 #if RTC_ENABLE_MEDIA
 
-// Media handling
-#include "mediachainablehandler.hpp"
+// Media
+#include "av1rtppacketizer.hpp"
+#include "h264rtppacketizer.hpp"
+#include "mediahandler.hpp"
+#include "opusrtppacketizer.hpp"
 #include "rtcpnackresponder.hpp"
 #include "rtcpreceivingsession.hpp"
 #include "rtcpsrreporter.hpp"
-
-// Opus/h264/AV1 streaming
-#include "h264packetizationhandler.hpp"
-#include "av1packetizationhandler.hpp"
-#include "opuspacketizationhandler.hpp"
 
 #endif // RTC_ENABLE_MEDIA

@@ -64,6 +64,7 @@ set(LIBDATACHANNEL_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/configuration.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/datachannel.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/description.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/mediahandler.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/global.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/message.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/peerconnection.cpp
@@ -75,15 +76,9 @@ set(LIBDATACHANNEL_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/rtcpsrreporter.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/rtppacketizer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/opusrtppacketizer.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/opuspacketizationhandler.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/h264rtppacketizer.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/nalunit.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/h264packetizationhandler.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/av1rtppacketizer.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/av1packetizationhandler.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/mediachainablehandler.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/mediahandlerelement.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/mediahandlerrootelement.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/nalunit.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/rtcpnackresponder.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/rtp.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/capi.cpp
@@ -112,15 +107,9 @@ set(LIBDATACHANNEL_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/rtcpsrreporter.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/rtppacketizer.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/opusrtppacketizer.hpp
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/opuspacketizationhandler.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/h264rtppacketizer.hpp
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/nalunit.hpp
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/h264packetizationhandler.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/av1rtppacketizer.hpp
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/av1packetizationhandler.hpp
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/mediachainablehandler.hpp
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/mediahandlerelement.hpp
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/mediahandlerrootelement.hpp
+	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/nalunit.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/rtcpnackresponder.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rtc/utils.hpp
 )

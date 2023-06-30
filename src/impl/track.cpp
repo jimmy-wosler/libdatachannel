@@ -19,8 +19,8 @@ static LogCounter COUNTER_MEDIA_BAD_DIRECTION(plog::warning,
 static LogCounter COUNTER_QUEUE_FULL(plog::warning,
                                      "Number of media packets dropped due to a full queue");
 
-Track::Track(weak_ptr<PeerConnection> pc, Description::Media description)
-    : mPeerConnection(pc), mMediaDescription(std::move(description)),
+Track::Track(weak_ptr<PeerConnection> pc, Description::Media desc)
+    : mPeerConnection(pc), mMediaDescription(std::move(desc)),
       mRecvQueue(RECV_QUEUE_LIMIT, [](const message_ptr &m) { return m->size(); }) {
 
 	// Discard messages by default if track is send only
@@ -38,26 +38,31 @@ Track::~Track() {
 }
 
 string Track::mid() const {
-	std::shared_lock lock(mMutex);
+	std::shared_lock lock(mDescriptionMutex);
 	return mMediaDescription.mid();
 }
 
 Description::Direction Track::direction() const {
-	std::shared_lock lock(mMutex);
+	std::shared_lock lock(mDescriptionMutex);
 	return mMediaDescription.direction();
 }
 
 Description::Media Track::description() const {
-	std::shared_lock lock(mMutex);
+	std::shared_lock lock(mDescriptionMutex);
 	return mMediaDescription;
 }
 
-void Track::setDescription(Description::Media description) {
-	std::unique_lock lock(mMutex);
-	if (description.mid() != mMediaDescription.mid())
-		throw std::logic_error("Media description mid does not match track mid");
+void Track::setDescription(Description::Media desc) {
+	{
+		std::unique_lock lock(mDescriptionMutex);
+		if (desc.mid() != mMediaDescription.mid())
+			throw std::logic_error("Media description mid does not match track mid");
 
-	mMediaDescription = std::move(description);
+		mMediaDescription = std::move(desc);
+	}
+
+	if (auto handler = getMediaHandler())
+		handler->media(description());
 }
 
 void Track::close() {
@@ -96,8 +101,7 @@ size_t Track::availableAmount() const { return mRecvQueue.amount(); }
 
 bool Track::isOpen(void) const {
 #if RTC_ENABLE_MEDIA
-	std::shared_lock lock(mMutex);
-	return !mIsClosed && mDtlsSrtpTransport.lock();
+	return !mIsClosed && getTransport();
 #else
 	return false;
 #endif
@@ -116,20 +120,24 @@ size_t Track::maxMessageSize() const {
 #if RTC_ENABLE_MEDIA
 void Track::open(shared_ptr<DtlsSrtpTransport> transport) {
 	{
-		std::lock_guard lock(mMutex);
-		mDtlsSrtpTransport = transport;
+		std::lock_guard lock(mTransportMutex);
+		mTransport = transport;
 	}
 
 	if (!mIsClosed)
 		triggerOpen();
 }
+
+shared_ptr<DtlsSrtpTransport> Track::getTransport() const {
+	std::lock_guard lock(mTransportMutex);
+	return mTransport.lock();
+}
+
 #endif
 
 void Track::incoming(message_ptr message) {
 	if (!message)
 		return;
-
-	auto handler = getMediaHandler();
 
 	auto dir = direction();
 	if ((dir == Description::Direction::SendOnly || dir == Description::Direction::Inactive) &&
@@ -138,8 +146,8 @@ void Track::incoming(message_ptr message) {
 		return;
 	}
 
-	if (handler) {
-		message = handler->incoming(message);
+	if(auto handler = getMediaHandler()) {
+		message = handler->incomingChain(std::move(message));
 		if (!message)
 			return;
 	}
@@ -172,7 +180,7 @@ bool Track::outgoing(message_ptr message) {
 	}
 
 	if (handler) {
-		message = handler->outgoing(message);
+		message = handler->outgoingChain(std::move(message));
 		if (!message)
 			return false;
 	}
@@ -182,20 +190,16 @@ bool Track::outgoing(message_ptr message) {
 
 bool Track::transportSend([[maybe_unused]] message_ptr message) {
 #if RTC_ENABLE_MEDIA
-	shared_ptr<DtlsSrtpTransport> transport;
-	{
-		std::shared_lock lock(mMutex);
-		transport = mDtlsSrtpTransport.lock();
-		if (!transport)
-			throw std::runtime_error("Track is closed");
+	auto transport = getTransport();
+	if (!transport)
+		throw std::runtime_error("Track is closed");
 
-		// Set recommended medium-priority DSCP value
-		// See https://www.rfc-editor.org/rfc/rfc8837.html#section-5
-		if (mMediaDescription.type() == "audio")
-			message->dscp = 46; // EF: Expedited Forwarding
-		else
-			message->dscp = 36; // AF42: Assured Forwarding class 4, medium drop probability
-	}
+	// Set recommended medium-priority DSCP value
+	// See https://www.rfc-editor.org/rfc/rfc8837.html#section-5
+	if (mMediaDescription.type() == "audio")
+		message->dscp = 46; // EF: Expedited Forwarding
+	else
+		message->dscp = 36; // AF42: Assured Forwarding class 4, medium drop probability
 
 	return transport->sendMedia(message);
 #else
@@ -204,22 +208,18 @@ bool Track::transportSend([[maybe_unused]] message_ptr message) {
 }
 
 void Track::setMediaHandler(shared_ptr<MediaHandler> handler) {
-	auto currentHandler = getMediaHandler();
-	if (currentHandler)
-		currentHandler->onOutgoing(nullptr);
-
-	{
-		std::unique_lock lock(mMutex);
-		mMediaHandler = handler;
+	auto oldHandler = std::atomic_exchange(&mMediaHandler, handler);
+	if (oldHandler) {
+		oldHandler->last()->onOutgoing(nullptr);
 	}
-
-	if (handler)
-		handler->onOutgoing(std::bind(&Track::transportSend, this, std::placeholders::_1));
+	if (handler) {
+		handler->last()->onOutgoing(weak_bind(&Track::transportSend, this, std::placeholders::_1));
+		handler->media(description());
+	}
 }
 
 shared_ptr<MediaHandler> Track::getMediaHandler() {
-	std::shared_lock lock(mMutex);
-	return mMediaHandler;
+	return std::atomic_load(&mMediaHandler);
 }
 
 } // namespace rtc::impl

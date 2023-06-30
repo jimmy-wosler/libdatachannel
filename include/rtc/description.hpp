@@ -78,14 +78,14 @@ public:
 	public:
 		virtual ~Entry() = default;
 
-		virtual string type() const { return mType; }
-		virtual string description() const { return mDescription; }
-		virtual string mid() const { return mMid; }
+		virtual string type() const;
+		virtual string description() const;
+		virtual string mid() const;
 
-		Direction direction() const { return mDirection; }
+		Direction direction() const;
 		void setDirection(Direction dir);
 
-		bool isRemoved() const { return mIsRemoved; }
+		bool isRemoved() const;
 		void markRemoved();
 
 		std::vector<string> attributes() const;
@@ -109,6 +109,7 @@ public:
 
 		std::vector<int> extIds();
 		ExtMap *extMap(int id);
+		const ExtMap *extMap(int id) const;
 		void addExtMap(ExtMap map);
 		void removeExtMap(int id);
 
@@ -144,12 +145,11 @@ public:
 		string description() const override;
 		Application reciprocate() const;
 
-		void setSctpPort(uint16_t port) { mSctpPort = port; }
-		void hintSctpPort(uint16_t port) { mSctpPort = mSctpPort.value_or(port); }
-		void setMaxMessageSize(size_t size) { mMaxMessageSize = size; }
-
-		optional<uint16_t> sctpPort() const { return mSctpPort; }
-		optional<size_t> maxMessageSize() const { return mMaxMessageSize; }
+		void setSctpPort(uint16_t port);
+		void hintSctpPort(uint16_t port);
+		void setMaxMessageSize(size_t size);
+		optional<uint16_t> sctpPort() const;
+		optional<size_t> maxMessageSize() const;
 
 		virtual void parseSdpLine(string_view line) override;
 
@@ -208,10 +208,10 @@ public:
 		bool hasPayloadType(int payloadType) const;
 		std::vector<int> payloadTypes() const;
 		RtpMap *rtpMap(int payloadType);
+		const RtpMap *rtpMap(int payloadType) const;
 		void addRtpMap(RtpMap map);
 		void removeRtpMap(int payloadType);
 		void removeFormat(const string &format);
-
 		void addRtxCodec(int payloadType, int origPayloadType, unsigned int clockRate);
 
 		virtual void parseSdpLine(string_view line) override;
@@ -233,9 +233,7 @@ public:
 		void addAudioCodec(int payloadType, string codec, optional<string> profile = std::nullopt);
 
 		void addOpusCodec(int payloadType, optional<string> profile = DEFAULT_OPUS_AUDIO_PROFILE);
-
 		void addPCMACodec(int payloadType, optional<string> profile = std::nullopt);
-
 		void addPCMUCodec(int payloadType, optional<string> profile = std::nullopt);
 	};
 

@@ -134,32 +134,26 @@ shared_ptr<NalUnits> H264RtpPacketizer::splitMessage(binary_ptr message) {
 
 H264RtpPacketizer::H264RtpPacketizer(shared_ptr<RtpPacketizationConfig> rtpConfig,
                                      uint16_t maximumFragmentSize)
-    : RtpPacketizer(rtpConfig), MediaHandlerRootElement(), maximumFragmentSize(maximumFragmentSize),
+    : RtpPacketizer(rtpConfig), maximumFragmentSize(maximumFragmentSize),
       separator(Separator::Length) {}
 
 H264RtpPacketizer::H264RtpPacketizer(H264RtpPacketizer::Separator separator,
                                      shared_ptr<RtpPacketizationConfig> rtpConfig,
                                      uint16_t maximumFragmentSize)
-    : RtpPacketizer(rtpConfig), MediaHandlerRootElement(), maximumFragmentSize(maximumFragmentSize),
-      separator(separator) {}
+    : RtpPacketizer(rtpConfig), maximumFragmentSize(maximumFragmentSize), separator(separator) {}
 
-ChainedOutgoingProduct
-H264RtpPacketizer::processOutgoingBinaryMessage(ChainedMessagesProduct messages,
-                                                message_ptr control) {
-	ChainedMessagesProduct packets = std::make_shared<std::vector<binary_ptr>>();
-	for (auto message : *messages) {
-		auto nalus = splitMessage(message);
-		auto fragments = nalus->generateFragments(maximumFragmentSize);
-		if (fragments.size() == 0) {
-			return ChainedOutgoingProduct();
-		}
-		unsigned i = 0;
-		for (; i < fragments.size() - 1; i++) {
-			packets->push_back(packetize(fragments[i], false));
-		}
-		packets->push_back(packetize(fragments[i], true));
-	}
-	return {packets, control};
+message_ptr H264RtpPacketizer::incoming(message_ptr message) { return message; }
+
+message_ptr H264RtpPacketizer::outgoing(message_ptr message) {
+	auto nalus = splitMessage(message);
+	auto fragments = nalus->generateFragments(maximumFragmentSize);
+	if (fragments.size() == 0)
+		return nullptr;
+
+	for (size_t i = 0; i < fragments.size() - 1; i++)
+		send(packetize(fragments[i], false));
+
+	return packetize(fragments[fragments.size() - 1], true);
 }
 
 } // namespace rtc

@@ -1,5 +1,6 @@
 /**
  * Copyright (c) 2020 Filip Klembara (in2core)
+ * Copyright (c) 2023 Paul-Louis Ageneau
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,23 +12,18 @@
 
 #if RTC_ENABLE_MEDIA
 
-#include "mediahandlerrootelement.hpp"
 #include "nalunit.hpp"
 #include "rtppacketizer.hpp"
 
 namespace rtc {
 
-/// RTP packetization of h264 payload
-class RTC_CPP_EXPORT H264RtpPacketizer final : public RtpPacketizer,
-                                               public MediaHandlerRootElement {
-	shared_ptr<NalUnits> splitMessage(binary_ptr message);
-	const uint16_t maximumFragmentSize;
-
+// RTP packetization of h264 payload
+class RTC_CPP_EXPORT H264RtpPacketizer final : public RtpPacketizer {
 public:
-	/// Default clock rate for H264 in RTP
+	// Default clock rate for H264 in RTP
 	inline static const uint32_t defaultClockRate = 90 * 1000;
 
-	/// NAL unit separator
+	// NAL unit separator
 	enum class Separator {
 		Length = RTC_NAL_SEPARATOR_LENGTH, // first 4 bytes are NAL unit length
 		LongStartSequence = RTC_NAL_SEPARATOR_LONG_START_SEQUENCE,   // 0x00, 0x00, 0x00, 0x01
@@ -39,19 +35,39 @@ public:
 	                  shared_ptr<RtpPacketizationConfig> rtpConfig,
 	                  uint16_t maximumFragmentSize = NalUnits::defaultMaximumFragmentSize);
 
-	/// Constructs h264 payload packetizer with given RTP configuration.
-	/// @note RTP configuration is used in packetization process which may change some configuration
-	/// properties such as sequence number.
-	/// @param rtpConfig  RTP configuration
-	/// @param maximumFragmentSize maximum size of one NALU fragment
+	// Constructs h264 payload packetizer with given RTP configuration.
+	// @note RTP configuration is used in packetization process which may change some configuration
+	// properties such as sequence number.
+	// @param rtpConfig  RTP configuration
+	// @param maximumFragmentSize maximum size of one NALU fragment
 	H264RtpPacketizer(shared_ptr<RtpPacketizationConfig> rtpConfig,
 	                  uint16_t maximumFragmentSize = NalUnits::defaultMaximumFragmentSize);
 
-	ChainedOutgoingProduct processOutgoingBinaryMessage(ChainedMessagesProduct messages,
-	                                                    message_ptr control) override;
+	message_ptr incoming(message_ptr message) override;
+	message_ptr outgoing(message_ptr message) override;
 
 private:
+	shared_ptr<NalUnits> splitMessage(binary_ptr message);
+
+	const uint16_t maximumFragmentSize;
 	const Separator separator;
+};
+
+// Dummy wrapper for backward compatibility
+class RTC_CPP_EXPORT H264PacketizationHandler final : public MediaHandler {
+public:
+	H264PacketizationHandler(shared_ptr<H264RtpPacketizer> packetizer)
+	    : mPacketizer(std::move(packetizer)) {}
+
+	inline message_ptr incoming(message_ptr message) override {
+		return mPacketizer->incoming(std::move(message));
+	}
+	inline message_ptr outgoing(message_ptr message) override {
+		return mPacketizer->outgoing(std::move(message));
+	}
+
+private:
+	shared_ptr<H264RtpPacketizer> mPacketizer;
 };
 
 } // namespace rtc

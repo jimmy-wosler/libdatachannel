@@ -44,6 +44,13 @@ void Track::setMediaHandler(shared_ptr<MediaHandler> handler) {
 	impl()->setMediaHandler(std::move(handler));
 }
 
+void Track::chainMediaHandler(shared_ptr<MediaHandler> handler) {
+	if(auto first = impl()->getMediaHandler())
+		first->addToChain(std::move(handler));
+	else
+		impl()->setMediaHandler(std::move(handler));
+}
+
 bool Track::requestKeyframe() {
 	// only push PLI for video
 	if (description().type() == "video") {
