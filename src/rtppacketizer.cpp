@@ -96,7 +96,23 @@ message_ptr RtpPacketizer::packetize(shared_ptr<binary> payload, bool mark) {
 	return message;
 }
 
-void RtpPacketizer::media([[maybe_unused]] const Description::Media &desc) {}
+void RtpPacketizer::media([[maybe_unused]] const Description::Media &desc) {
+	rtpConfig->mid = desc.mid();
+
+	// TODO: format
+	// for(int pt : desc.payloadTypes()) {
+	// const auto *map = desc.rtpMap(pt);
+	// map->format
+	// }
+
+	auto ssrcs = desc.getSSRCs();
+	if (!ssrcs.empty()) {
+		auto ssrc = ssrcs[0];
+		rtpConfig->ssrc = ssrc;
+		if (auto cname = desc.getCNameForSsrc(ssrc))
+			rtpConfig->cname = *cname;
+	}
+}
 
 } // namespace rtc
 
