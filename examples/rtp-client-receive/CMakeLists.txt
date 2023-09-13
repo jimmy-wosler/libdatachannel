@@ -26,29 +26,29 @@ set(CLIENT_UWP_RESOURCES
 
 if(WIN32)
 	if(CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
-		add_executable(datachannel-client ${CLIENT_SOURCES} ${GETOPT_SOURCES} ${CLIENT_UWP_RESOURCES})
+		add_executable(datachannel-rtp-client-receive ${CLIENT_SOURCES} ${GETOPT_SOURCES} ${CLIENT_UWP_RESOURCES})
 	else()
-	    add_executable(datachannel-client ${CLIENT_SOURCES} ${GETOPT_SOURCES})
+	    add_executable(datachannel-rtp-client-receive ${CLIENT_SOURCES} ${GETOPT_SOURCES})
 	endif()
-	target_compile_definitions(datachannel-client PUBLIC STATIC_GETOPT)
+	target_compile_definitions(datachannel-rtp-client-receive PUBLIC STATIC_GETOPT)
 else()
-	add_executable(datachannel-client ${CLIENT_SOURCES})
+	add_executable(datachannel-rtp-client-receive ${CLIENT_SOURCES})
 endif()
 
-set_target_properties(datachannel-client PROPERTIES
+set_target_properties(datachannel-rtp-client-receive PROPERTIES
 	CXX_STANDARD 17
 	OUTPUT_NAME client)
 
-set_target_properties(datachannel-client PROPERTIES
+set_target_properties(datachannel-rtp-client-receive PROPERTIES
 	XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER com.github.paullouisageneau.libdatachannel.examples.client)
 
 find_package(Threads REQUIRED)
-target_link_libraries(datachannel-client LibDataChannel::LibDataChannel Threads::Threads nlohmann_json::nlohmann_json)
+target_link_libraries(datachannel-rtp-client-receive LibDataChannel::LibDataChannel Threads::Threads nlohmann_json::nlohmann_json)
 
 if(MSVC)
-	add_custom_command(TARGET datachannel-client POST_BUILD
+	add_custom_command(TARGET datachannel-rtp-client-receive POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"$<TARGET_FILE_DIR:datachannel>/datachannel.dll"
-		$<TARGET_FILE_DIR:datachannel-client>
+		$<TARGET_FILE_DIR:datachannel-rtp-client-receive>
 	)
 endif()

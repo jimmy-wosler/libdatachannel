@@ -165,6 +165,8 @@ int main(int argc, char **argv) try {
 		std::cout << "Offering to " + id << std::endl;
 		auto pc = createPeerConnection(config, ws, id);
 
+		
+
 		SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
 		struct sockaddr_in addr = {};
 		addr.sin_family = AF_INET;
@@ -172,7 +174,7 @@ int main(int argc, char **argv) try {
 		addr.sin_port = htons(6232);
 
 		if (bind(sock, reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) < 0)
-			throw std::runtime_error("Failed to bind UDP socket on 127.0.0.1:6000");
+			throw std::runtime_error("Failed to bind UDP socket on 127.0.0.1:6232");
 
 		int rcvBufSize = 212992;
 		setsockopt(sock, SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char *>(&rcvBufSize),
@@ -186,10 +188,16 @@ int main(int argc, char **argv) try {
 
 		pc->setLocalDescription();
 
-		std::cout << "RTP video stream expected on localhost:6000" << std::endl;
+		std::cout << "RTP video stream expected on localhost:6232" << std::endl;
 		std::cout << "Please copy/paste the answer provided by the browser: " << std::endl;
 		std::string sdp;
+
 		std::getline(std::cin, sdp);
+
+		json j = json::parse(sdp);
+		rtc::Description answer(j["sdp"].get<std::string>(), j["type"].get<std::string>());
+		pc->setRemoteDescription(answer);
+
 
 		// We are the offerer, so create a data channel to initiate the process
 
@@ -248,14 +256,26 @@ shared_ptr<rtc::PeerConnection> createPeerConnection(const rtc::Configuration &c
 	pc->onStateChange(
 	    [](rtc::PeerConnection::State state) { std::cout << "State: " << state << std::endl; });
 
-	pc->onGatheringStateChange([](rtc::PeerConnection::GatheringState state) {
-		std::cout << "Gathering State: " << state << std::endl;
-	});
+	// pc->onGatheringStateChange([](rtc::PeerConnection::GatheringState state) {
+	// 	std::cout << "Gathering State: " << state << std::endl;
+	// });
+	pc->onGatheringStateChange([pc](rtc::PeerConnection::GatheringState state) {
+			std::cout << "Gathering State: " << state << std::endl;
+			if (state == rtc::PeerConnection::GatheringState::Complete) {
+				auto description = pc->localDescription();
+				json message = {{"type", description->typeString()},
+				                {"sdp", std::string(description.value())}};
+				std::cout << message << std::endl;
+			}
+		});
 
 	pc->onLocalDescription([wws, id](rtc::Description description) {
 		json message = {{"id", id},
 		                {"type", description.typeString()},
 		                {"description", std::string(description)}};
+
+		std::cout << "########### LOCAL DESC ###########" << "\n\n";
+		std::cout << message.dump() << "\n\n";
 
 		if (auto ws = wws.lock())
 			ws->send(message.dump());
